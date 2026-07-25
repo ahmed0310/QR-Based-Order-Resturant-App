@@ -144,7 +144,7 @@ const QRCode = () => {
 
               {/* QR Code */}
               <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-center mb-6">
-                <QRCodeComponent
+                <QRCodeSVG
                   ref={(el) => (qrRefs.current[table._id] = el)}
                   value={getTableQrUrl(table)}
                   size={200}
