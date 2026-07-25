@@ -13,7 +13,7 @@ app.use(cors());
 
 app.use(cors({
   origin: "*",   // for testing
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 }));
 
 app.use(express.json());

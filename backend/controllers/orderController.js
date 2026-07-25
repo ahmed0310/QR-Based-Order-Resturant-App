@@ -1,6 +1,8 @@
+import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Table from "../models/Table.js";
+import Shop from "../models/Shop.js";
 
 /**
  * Statuses a shop admin is allowed to set. "served" is intentionally excluded:
@@ -29,11 +31,38 @@ export const createQrOrder = async (req, res) => {
       });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(shopId)) {
+      return res.status(400).json({ msg: "Invalid shop id" });
+    }
+
+    if (tableId && !mongoose.Types.ObjectId.isValid(tableId)) {
+      return res.status(400).json({ msg: "Invalid table id" });
+    }
+
+    const shop = await Shop.findById(shopId).select("_id status");
+    if (!shop) {
+      return res.status(404).json({ msg: "Shop not found" });
+    }
+
+    const normalizedPhone = String(customerPhone).replace(/\D/g, "");
+    if (!/^[0-9]{10}$/.test(normalizedPhone)) {
+      return res.status(400).json({ msg: "Please provide a valid 10-digit phone number" });
+    }
+
     let orderItems = [];
     let totalAmount = 0;
 
     // Validate each product
     for (const item of items) {
+      if (!item?.productId || !mongoose.Types.ObjectId.isValid(item.productId)) {
+        return res.status(400).json({ msg: "Invalid product in order" });
+      }
+
+      const quantity = Number(item.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        return res.status(400).json({ msg: "Each item must have a quantity of at least 1" });
+      }
+
       const product = await Product.findOne({
         _id: item.productId,
         shopId,
@@ -50,11 +79,11 @@ export const createQrOrder = async (req, res) => {
         productId: product._id,
         name: product.name,
         price: product.price,
-        quantity: item.quantity,
+        quantity,
         isVeg: product.isVeg,
       };
 
-      totalAmount += product.price * item.quantity;
+      totalAmount += product.price * quantity;
 
       orderItems.push(orderItem);
     }
@@ -62,21 +91,21 @@ export const createQrOrder = async (req, res) => {
     // Derive the human-readable table number from the table itself when the
     // client didn't supply one, so the dashboard and customer view can always
     // display "Table N" for QR orders.
-    let resolvedTableNo = tableNo;
+    let resolvedTableNo = tableNo != null ? String(tableNo) : undefined;
     if (!resolvedTableNo && tableId) {
       const table = await Table.findOne({ _id: tableId, shopId }).select(
         "tableNumber"
       );
-      if (table) resolvedTableNo = table.tableNumber;
+      if (table) resolvedTableNo = String(table.tableNumber);
     }
 
     const order = await Order.create({
       shopId,
       items: orderItems,
       totalAmount,
-      tableId,
+      tableId: tableId || undefined,
       tableNo: resolvedTableNo,
-      customerPhone,
+      customerPhone: normalizedPhone,
       orderSource: "qr",
       paymentStatus: "pending",
       status: "pending",

@@ -77,9 +77,12 @@ const ShopDashboard = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      preparing: 'bg-orange-100 text-orange-700 border-orange-200',
-      served: 'bg-blue-100 text-blue-700 border-blue-200',
       pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      confirmed: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+      preparing: 'bg-orange-100 text-orange-700 border-orange-200',
+      ready: 'bg-blue-100 text-blue-700 border-blue-200',
+      completed: 'bg-green-100 text-green-700 border-green-200',
+      served: 'bg-green-100 text-green-700 border-green-200',
       cancelled: 'bg-red-100 text-red-700 border-red-200',
     };
     return colors[status] || 'bg-gray-100 text-gray-700 border-gray-200';
@@ -261,8 +264,10 @@ const ShopDashboard = () => {
                           className="text-xs border border-gray-300 rounded px-2 py-1 capitalize"
                         >
                           <option value="pending">Pending</option>
+                          <option value="confirmed">Confirmed</option>
                           <option value="preparing">Preparing</option>
-                          <option value="served">Served</option>
+                          <option value="ready">Ready</option>
+                          <option value="completed">Completed</option>
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </td>

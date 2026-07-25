@@ -86,10 +86,12 @@ const PublicOrder = () => {
     setLoading(true);
 
     try {
+      const normalizedPhone = formData.customerPhone.replace(/\D/g, '');
+
       const orderData = {
         shopId,
         tableNo: formData.tableNo,
-        customerPhone: formData.customerPhone,
+        customerPhone: normalizedPhone,
         items: cart.map(item => ({
           productId: item._id,
           quantity: item.quantity

@@ -47,13 +47,9 @@ const shopAdminSchema = new mongoose.Schema(
 shopAdminSchema.index({ shopId: 1 });
 
 /* Hash Password */
-shopAdminSchema.pre("save", async function (next) {
-  try {
-    if (!this.isModified("password")) return next();
-    this.password = await bcrypt.hash(this.password, 10);
-  } catch (error) {
-    console.log(error);
-  }
+shopAdminSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 /* Compare Password */
