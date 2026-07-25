@@ -1,5 +1,20 @@
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import Table from "../models/Table.js";
+
+/**
+ * Statuses a shop admin is allowed to set. "served" is intentionally excluded:
+ * it is a legacy value that the model still accepts for existing documents,
+ * but new transitions should use "completed" instead.
+ */
+const ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready",
+  "completed",
+  "cancelled",
+];
 
 /* ================================
    Create QR Order
@@ -44,12 +59,23 @@ export const createQrOrder = async (req, res) => {
       orderItems.push(orderItem);
     }
 
+    // Derive the human-readable table number from the table itself when the
+    // client didn't supply one, so the dashboard and customer view can always
+    // display "Table N" for QR orders.
+    let resolvedTableNo = tableNo;
+    if (!resolvedTableNo && tableId) {
+      const table = await Table.findOne({ _id: tableId, shopId }).select(
+        "tableNumber"
+      );
+      if (table) resolvedTableNo = table.tableNumber;
+    }
+
     const order = await Order.create({
       shopId,
       items: orderItems,
       totalAmount,
       tableId,
-      tableNo,
+      tableNo: resolvedTableNo,
       customerPhone,
       orderSource: "qr",
       paymentStatus: "pending",
@@ -97,9 +123,9 @@ export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!status || !["pending", "preparing", "served", "cancelled"].includes(status)) {
+    if (!status || !ORDER_STATUSES.includes(status)) {
       return res.status(400).json({
-        msg: "Invalid status. Must be: pending, preparing, served, or cancelled",
+        msg: `Invalid status. Must be one of: ${ORDER_STATUSES.join(", ")}`,
       });
     }
 
@@ -161,6 +187,7 @@ export const getOrderStatus = async (req, res) => {
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       tableNo: order.tableNo,
+      tableId: order.tableId,
     });
 
   } catch (error) {

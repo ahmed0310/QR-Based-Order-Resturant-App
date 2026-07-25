@@ -15,6 +15,7 @@ import {
   updateTable,
   deleteTable,
   getTableByQrCode,
+  getPublicTableById,
 } from "../controllers/shopController.js";
 
 import {
@@ -52,7 +53,9 @@ router.put("/tables/:id", protect, isShopAdmin, updateTable);
 router.delete("/tables/:id", protect, isShopAdmin, deleteTable);
 
 /* Public Table Routes */
+/* Declared before "/table/:id" so the literal "qr" segment always wins. */
 router.get("/table/qr/:qrCode", getTableByQrCode);
+router.get("/table/:id", getPublicTableById);
 
 /* Public Menu */
 router.get("/menu/:shopId", getShopMenu);

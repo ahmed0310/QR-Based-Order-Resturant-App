@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, Check, Clock, ChefHat, UtensilsCrossed, Home } from 'lucide-react';
+import { Loader2, AlertCircle, Check, Clock, ChefHat, UtensilsCrossed, Home, XCircle } from 'lucide-react';
 import { apiUrl } from '../../utils/api';
+
+// Statuses after which the order can no longer change.
+const TERMINAL_STATUSES = ['completed', 'served', 'cancelled'];
 
 const OrderStatus = () => {
   const { orderId, phoneNumber } = useParams();
@@ -12,10 +15,14 @@ const OrderStatus = () => {
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   // Fetch order status
-  const fetchOrderStatus = async () => {
+  const fetchOrderStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${apiUrl('/api/order')}/${orderId}/status?phone=${phoneNumber}`);
-      
+      const response = await fetch(
+        apiUrl(
+          `/api/order/${orderId}/status?phone=${encodeURIComponent(phoneNumber)}`
+        )
+      );
+
       if (!response.ok) {
         throw new Error('Order not found or phone number doesn\'t match');
       }
@@ -30,16 +37,23 @@ const OrderStatus = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, phoneNumber]);
+
+  // A finished order will never change again, so polling can stop.
+  const isTerminal = TERMINAL_STATUSES.includes(order?.status);
 
   useEffect(() => {
     fetchOrderStatus();
-    
+  }, [fetchOrderStatus]);
+
+  useEffect(() => {
+    if (isTerminal) return;
+
     // Poll for updates every 5 seconds
     const interval = setInterval(fetchOrderStatus, 5000);
-    
+
     return () => clearInterval(interval);
-  }, [orderId, phoneNumber]);
+  }, [fetchOrderStatus, isTerminal]);
 
   const getStatusSteps = () => [
     { 
@@ -77,7 +91,10 @@ const OrderStatus = () => {
   const getStatusIndex = () => {
     if (!order) return -1;
     const steps = getStatusSteps();
-    return steps.findIndex(step => step.status === order.status);
+    // "served" is a legacy value equivalent to "completed"; map it so older
+    // orders still light up the final step instead of resolving to -1.
+    const normalized = order.status === 'served' ? 'completed' : order.status;
+    return steps.findIndex(step => step.status === normalized);
   };
 
   const statusIndex = getStatusIndex();
@@ -112,6 +129,74 @@ const OrderStatus = () => {
     );
   }
 
+  // Cancelled is a terminal, off-path status, so the progress timeline is
+  // replaced by a dedicated view while still showing the order contents.
+  if (order?.status === 'cancelled') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-rose-50 py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white border border-red-200 rounded-xl shadow-sm p-8 text-center mb-6">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <XCircle className="w-10 h-10 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Cancelled</h1>
+            <p className="text-gray-600 mb-6">
+              This order was cancelled. Please speak to a member of staff if you
+              believe this is a mistake.
+            </p>
+
+            <div className="bg-gray-50 rounded-lg p-4 text-left space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Order Number:</span>
+                <span className="font-bold text-gray-900">{order?.orderNumber || 'N/A'}</span>
+              </div>
+              {order?.tableNo && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Table:</span>
+                  <span className="font-semibold text-gray-900">{order.tableNo}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total:</span>
+                <span className="font-bold text-gray-900">
+                  ${order?.totalAmount?.toFixed(2) || '0.00'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Order Items</h2>
+            <div className="space-y-3">
+              {order?.items?.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-start py-3 border-b border-gray-200 last:border-b-0"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">{item.name}</h3>
+                    <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                  </div>
+                  <span className="font-semibold text-gray-900 ml-2">
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/')}
+            className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2"
+          >
+            <Home className="w-4 h-4" />
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -134,9 +219,10 @@ const OrderStatus = () => {
           {/* Status Badge */}
           <div className="flex items-center gap-3">
             <div className={`px-4 py-2 rounded-full font-semibold ${
-              order?.status === 'completed' ? 'bg-green-100 text-green-700' :
+              order?.status === 'completed' || order?.status === 'served' ? 'bg-green-100 text-green-700' :
               order?.status === 'ready' ? 'bg-blue-100 text-blue-700' :
               order?.status === 'preparing' ? 'bg-yellow-100 text-yellow-700' :
+              order?.status === 'confirmed' ? 'bg-indigo-100 text-indigo-700' :
               'bg-gray-100 text-gray-700'
             }`}>
               {order?.status?.charAt(0).toUpperCase() + order?.status?.slice(1) || 'Unknown'}
@@ -264,16 +350,14 @@ const OrderStatus = () => {
         {/* Auto-refresh Info */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Status updates automatically every 5 seconds
+            {isTerminal
+              ? 'This order is complete. Thanks for dining with us!'
+              : 'Status updates automatically every 5 seconds'}
           </p>
-          {order?.status === 'completed' && (
-            <div className="mt-4">
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-              >
-                ✓ Order Complete!
-              </button>
+          {isTerminal && (
+            <div className="mt-4 inline-flex items-center gap-2 px-6 py-2.5 bg-green-100 text-green-700 rounded-lg font-semibold">
+              <Check className="w-4 h-4" />
+              Order Complete
             </div>
           )}
         </div>

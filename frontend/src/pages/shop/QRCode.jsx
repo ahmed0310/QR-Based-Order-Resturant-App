@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { QrCode, Download, Printer, Copy, Check, Layers } from 'lucide-react';
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { APP_BASE, apiUrl } from '../../utils/api';
 
 const QRCode = () => {
@@ -38,8 +38,10 @@ const QRCode = () => {
     }
   };
 
+  // Must match the "/table/:qrCode" route registered in App.jsx. QRLanding
+  // resolves the code to a shop + table and forwards to the customer menu.
   const getTableQrUrl = (table) => {
-    return `${APP_BASE}/menu/${shopId}/table/${table.qrCode}`;
+    return `${APP_BASE}/table/${table.qrCode}`;
   };
 
   const handleDownloadQR = (table) => {
@@ -144,12 +146,13 @@ const QRCode = () => {
 
               {/* QR Code */}
               <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-center mb-6">
-                <QRCodeComponent
+                {/* Canvas (not SVG) so download/print can call toDataURL() */}
+                <QRCodeCanvas
                   ref={(el) => (qrRefs.current[table._id] = el)}
                   value={getTableQrUrl(table)}
                   size={200}
                   level="H"
-                  includeMargin={true}
+                  marginSize={2}
                 />
               </div>
 

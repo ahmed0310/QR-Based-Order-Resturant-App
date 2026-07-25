@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BookOpen, ShoppingCart, X, Loader2, AlertCircle, Minus, Plus, Trash2 } from 'lucide-react';
-import { apiUrl, APP_BASE } from '../../utils/api';
+import { apiUrl } from '../../utils/api';
 
 const CustomerMenu = () => {
   const { shopId, tableId } = useParams();
@@ -28,8 +28,10 @@ const CustomerMenu = () => {
       const menuData = await menuResponse.json();
       setMenuItems(menuData);
 
-      // Fetch table info
-      const tableResponse = await fetch(`${APP_BASE}/api/shop/tables/${tableId}`);
+      // Fetch table info from the public endpoint. This is intentionally
+      // non-fatal: if it fails the menu is still fully usable, we just can't
+      // show the table header.
+      const tableResponse = await fetch(apiUrl(`/api/shop/table/${tableId}`));
       if (tableResponse.ok) {
         const table = await tableResponse.json();
         setTableInfo(table);
@@ -91,7 +93,9 @@ const CustomerMenu = () => {
       alert('Please add items to cart');
       return;
     }
-    navigate(`/customer/checkout/${shopId}/${tableId}`, { state: { cart, tableId, shopId } });
+    navigate(`/customer/checkout/${shopId}/${tableId}`, {
+  state: { cart, tableId, shopId, tableNo: tableInfo?.tableNumber },
+});
   };
 
   if (loading) {

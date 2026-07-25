@@ -80,7 +80,13 @@ const orderSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "pending",
+                "confirmed",
                 "preparing",
+                "ready",
+                "completed",
+                // "served" is a legacy alias of "completed", kept so that
+                // documents created before the status model was expanded
+                // remain valid on save.
                 "served",
                 "cancelled",
             ],

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ShoppingCart, FileText, ArrowLeft, Check, Loader2, Info } from 'lucide-react';
 import { apiUrl } from '../../utils/api';
@@ -18,6 +18,26 @@ const CustomerCheckout = () => {
   });
 
   const [errors, setErrors] = useState({});
+
+  // The digits-only phone actually persisted with the order. Order status
+  // verification compares against this exact value, so we must reuse it in the
+  // redirect rather than the raw (possibly formatted) input.
+  const [submittedPhone, setSubmittedPhone] = useState('');
+
+  // Redirect to order status after the success screen. This lives in an effect
+  // (not the render body) so it is scheduled exactly once and cleaned up.
+  useEffect(() => {
+    if (!orderSuccess || !orderDetails) return;
+
+    const timer = setTimeout(() => {
+      navigate(
+        `/customer/order-status/${orderDetails.orderId}/${submittedPhone}`,
+        { replace: true }
+      );
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [orderSuccess, orderDetails, submittedPhone, navigate]);
 
   // Redirect if cart is empty
   if (cart.length === 0 && !orderSuccess) {
@@ -79,10 +99,14 @@ const CustomerCheckout = () => {
     setLoading(true);
 
     try {
+      // Persist a digits-only phone so later status lookups match exactly.
+      const normalizedPhone = formData.customerPhone.replace(/\D/g, '');
+
       const orderData = {
         shopId,
         tableId,
-        customerPhone: formData.customerPhone,
+        tableNo: location.state?.tableNo,
+        customerPhone: normalizedPhone,
         items: cart.map(item => ({
           productId: item._id,
           quantity: item.quantity
@@ -103,6 +127,7 @@ const CustomerCheckout = () => {
         throw new Error(data.msg || 'Failed to create order');
       }
 
+      setSubmittedPhone(normalizedPhone);
       setOrderDetails(data);
       setOrderSuccess(true);
 
@@ -114,12 +139,8 @@ const CustomerCheckout = () => {
     }
   };
 
-  // Success Screen - Redirect to Order Status
+  // Success Screen - redirect is handled by the effect above
   if (orderSuccess && orderDetails) {
-    setTimeout(() => {
-      navigate(`/customer/order-status/${orderDetails.orderId}/${formData.customerPhone}`, { replace: true });
-    }, 2000);
-
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
         <div className="bg-white border border-green-200 rounded-xl p-8 max-w-md w-full text-center shadow-lg">
@@ -278,7 +299,7 @@ const CustomerCheckout = () => {
               <h3 className="font-semibold text-gray-900 mb-1">What Happens Next?</h3>
               <p className="text-sm text-gray-700">
                 After placing your order, you can track its status in real-time. Your order will move through stages: 
-                <span className="font-medium"> Pending → Preparing → Ready → Completed</span>
+                <span className="font-medium"> Pending → Confirmed → Preparing → Ready → Completed</span>
               </p>
             </div>
           </div>

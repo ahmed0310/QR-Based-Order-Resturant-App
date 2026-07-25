@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import Shop from "../models/Shop.js";
 import Table from "../models/Table.js";
@@ -301,6 +302,36 @@ export const getTableDetails = async (req, res) => {
 
   } catch (error) {
     console.error("Get Table Details Error:", error);
+    res.status(500).json({ msg: "Server Error" });
+  }
+};
+
+/* ================================
+   Get Public Table By Id (Customer)
+   Used by the QR ordering flow, which is anonymous and therefore cannot
+   call the shop-admin protected getTableDetails route. Only non-sensitive
+   fields are returned.
+================================ */
+export const getPublicTableById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ msg: "Invalid table id" });
+    }
+
+    const table = await Table.findById(id).select(
+      "_id tableNumber name capacity status shopId"
+    );
+
+    if (!table) {
+      return res.status(404).json({ msg: "Table not found" });
+    }
+
+    res.json(table);
+
+  } catch (error) {
+    console.error("Get Public Table Error:", error);
     res.status(500).json({ msg: "Server Error" });
   }
 };

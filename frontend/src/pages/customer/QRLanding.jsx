@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader, AlertCircle } from 'lucide-react';
-import { APP_BASE } from '../../utils/api';
+import { apiUrl } from '../../utils/api';
 
 export default function QRLanding() {
   const { qrCode } = useParams();
@@ -12,8 +12,10 @@ export default function QRLanding() {
   useEffect(() => {
     const fetchTableAndRedirect = async () => {
       try {
-        const response = await fetch(`${APP_BASE}/api/shop/table/qr/${qrCode}`);
-        
+        const response = await fetch(
+          apiUrl(`/api/shop/table/qr/${encodeURIComponent(qrCode)}`)
+        );
+
         if (!response.ok) {
           setError('Invalid QR code or table not found');
           setLoading(false);
@@ -21,9 +23,18 @@ export default function QRLanding() {
         }
 
         const table = await response.json();
-        
+
+        // shopId may arrive populated (an object) or as a raw id string.
+        const shopId = table?.shopId?._id ?? table?.shopId;
+
+        if (!shopId || !table?._id) {
+          setError('This QR code is not linked to a valid table.');
+          setLoading(false);
+          return;
+        }
+
         // Redirect to customer menu with tableId and shopId
-        navigate(`/customer/menu/${table.shopId}/${table._id}`, { replace: true });
+        navigate(`/customer/menu/${shopId}/${table._id}`, { replace: true });
       } catch (err) {
         console.error('QR Lookup Error:', err);
         setError('Unable to process QR code. Please try again.');
